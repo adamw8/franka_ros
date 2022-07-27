@@ -1,4 +1,11 @@
 <library path="lib/libfranka_example_controllers">
+  <class name="franka_example_controllers/DrakeImpedanceController"
+         type="franka_example_controllers::DrakeImpedanceController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      A controller that reads torque commands from Drake to control the robot
+    </description>
+  </class>
   <class name="franka_example_controllers/JointVelocityExampleController" type="franka_example_controllers::JointVelocityExampleController" base_class_type="controller_interface::ControllerBase">
     <description>
       A controller that executes a short motion based on joint velocities to demonstrate correct usage

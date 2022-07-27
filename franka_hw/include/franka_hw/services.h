@@ -17,6 +17,7 @@
 #include <franka_msgs/SetJointImpedance.h>
 #include <franka_msgs/SetKFrame.h>
 #include <franka_msgs/SetLoad.h>
+#include <franka_msgs/TriggerError.h>
 
 namespace franka_hw {
 

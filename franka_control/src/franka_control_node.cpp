@@ -12,6 +12,7 @@
 #include <franka_hw/franka_hw.h>
 #include <franka_hw/services.h>
 #include <franka_msgs/ErrorRecoveryAction.h>
+#include <franka_msgs/TriggerError.h>
 #include <ros/ros.h>
 #include <std_srvs/Trigger.h>
 
@@ -43,7 +44,14 @@ int main(int argc, char** argv) {
 
     services = std::make_unique<ServiceContainer>();
     franka_hw::setupServices(robot, franka_control.robotMutex(), node_handle, *services);
-
+    
+    // service for e-stop
+    services->advertiseService<franka_msgs::TriggerError>( // trigger error service for killing control
+          node_handle, "/franka_control/trigger_error",
+          [&has_error](auto&& req, auto&& res) {
+            ROS_INFO("has_error switched to %d", req.has_error);
+            has_error = req.has_error; });
+    
     recovery_action_server =
         std::make_unique<actionlib::SimpleActionServer<franka_msgs::ErrorRecoveryAction>>(
             node_handle, "error_recovery",
@@ -116,6 +124,11 @@ int main(int argc, char** argv) {
 
     // Wait until controller has been activated or error has been recovered
     while (!franka_control.controllerActive() || has_error) {
+      // if (has_error){
+      //   ROS_ERROR("Has_error triggered! Break out of franka control callback!");
+      //   return false;
+      // }
+      
       if (franka_control.connected()) {
         try {
           std::lock_guard<std::mutex> lock(franka_control.robotMutex());
@@ -144,6 +157,9 @@ int main(int argc, char** argv) {
             control_manager.update(now, period, true);
             franka_control.checkJointLimits();
             franka_control.reset();
+          } else if (has_error) {
+              ROS_ERROR("Has_error triggered! Break out of franka control callback!");
+              return false;
           } else {
             control_manager.update(now, period);
             franka_control.checkJointLimits();

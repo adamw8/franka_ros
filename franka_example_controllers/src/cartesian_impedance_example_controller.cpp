@@ -172,6 +172,8 @@ void CartesianImpedanceExampleController::update(const ros::Time& /*time*/,
   // Cartesian PD control with damping ratio = 1
   tau_task << jacobian.transpose() *
                   (-cartesian_stiffness_ * error - cartesian_damping_ * (jacobian * dq));
+  // std::cout << "K\n" << cartesian_stiffness_ << std::endl;
+  // std::cout << "B\n" << cartesian_damping_ << std::endl;
   // nullspace PD control with damping ratio = 1
   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
                     jacobian.transpose() * jacobian_transpose_pinv) *
@@ -179,6 +181,7 @@ void CartesianImpedanceExampleController::update(const ros::Time& /*time*/,
                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
   // Desired torque
   tau_d << tau_task + tau_nullspace + coriolis;
+  std::cout << "tau\n" << tau_d << std::endl;
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRate(tau_d, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {

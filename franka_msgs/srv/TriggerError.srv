@@ -1,0 +1,4 @@
+bool has_error
+---
+bool success
+string error

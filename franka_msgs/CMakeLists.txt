@@ -13,6 +13,7 @@ add_service_files(FILES
   SetJointImpedance.srv
   SetKFrame.srv
   SetLoad.srv
+  TriggerError.srv
 )
 
 add_action_files(FILES ErrorRecovery.action)
