@@ -9,6 +9,7 @@
 #include <franka/robot_state.h>
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
+#include "sensor_msgs/JointState.h"
 
 namespace franka_example_controllers {
 
@@ -18,6 +19,8 @@ bool DrakeImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   sub_torque_commands_ = node_handle.subscribe(
       "/c3/franka_input", 1, &DrakeImpedanceController::torqueCommandCallback, this,
       ros::TransportHints().reliable().tcpNoDelay());
+
+  pub_joint_states_ = node_handle.advertise<sensor_msgs::JointState>("/c3/joint_states", 1);
 
   std::string arm_id;
   if (!node_handle.getParam("arm_id", arm_id)) {
@@ -107,6 +110,9 @@ void DrakeImpedanceController::update(const ros::Time& /*time*/,
                                                  const ros::Duration& /*period*/) {
   // get state variables
   franka::RobotState robot_state = state_handle_->getRobotState();
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> tau(robot_state.tau_J.data());
 
   // local copy of tau_d_
   // allows function to release lock ASAP
@@ -123,14 +129,66 @@ void DrakeImpedanceController::update(const ros::Time& /*time*/,
 
   // Saturate torque rate to avoid discontinuities
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
+
+  // std::cout << "before clamping" << std::endl;
+  // for (size_t i = 0; i < 7; ++i) {
+  //   std::cout << "joint" << i+1 << ": " << tau_d(i) << std::endl;
+  // }
+
+  tau_d << clampTorques(tau_d);
+  // std::cout << "after clamping" << std::endl;
+  // for (size_t i = 0; i < 7; ++i) {
+  //   std::cout << "joint" << i+1 << ": " << tau_d(i) << std::endl;
+  // }
+
   tau_d << saturateTorqueRate(tau_d, tau_J_d);
+  // std::cout << "after saturating" << std::endl;
+  // for (size_t i = 0; i < 7; ++i) {
+  //   std::cout << "prev_joint" << i+1 << ": " << tau_J_d(i) << std::endl;
+  //   std::cout << "joint" << i+1 << ": " << tau_d(i) << std::endl;
+  // }
 
   // send the torques
   for (size_t i = 0; i < 7; ++i) {
-    std::cout << "joint" << i << ": " << tau_d(i) << std::endl;
-    // joint_handles_[i].setCommand(tau_d(i));
-    joint_handles_[i].setCommand(0);
+    // std::cout << "joint" << i+1 << ": " << tau_d(i) << std::endl;
+    joint_handles_[i].setCommand(tau_d(i));
+    // joint_handles_[i].setCommand(0.0);
   }
+
+  sensor_msgs::JointState msg;
+  msg.position.resize(7);
+  msg.velocity.resize(7);
+  msg.effort.resize(7);
+  for (size_t i = 0; i < 7; i++){
+    msg.position[i] = q(i);
+    msg.velocity[i] = dq(i);
+    msg.effort[i] = tau(i);
+  }
+  pub_joint_states_.publish(msg);
+}
+
+Eigen::Matrix<double, 7, 1> DrakeImpedanceController::clampTorques(
+    const Eigen::Matrix<double, 7, 1>& tau_d) const {  // NOLINT (readability-identifier-naming)
+  Eigen::Matrix<double, 7, 1> tau_d_clamped{};
+
+  double limit = 20;
+  double wrist_limit = 2;
+
+  for (size_t i = 0; i < 4; i++) {
+    tau_d_clamped(i) = tau_d(i);
+    if (abs(tau_d(i)) > limit) {
+      double sign = tau_d(i) / abs(tau_d(i));
+      tau_d_clamped(i) = sign * limit;
+    }
+  }
+  for (size_t i = 4; i < 7; i++) {
+    tau_d_clamped(i) = tau_d(i);
+    if (abs(tau_d(i)) > wrist_limit) {
+      double sign = tau_d(i) / abs(tau_d(i));
+      tau_d_clamped(i) = sign * wrist_limit;
+    }
+  }
+  return tau_d_clamped;
 }
 
 Eigen::Matrix<double, 7, 1> DrakeImpedanceController::saturateTorqueRate(

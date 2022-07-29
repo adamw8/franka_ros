@@ -37,6 +37,8 @@ class DrakeImpedanceController : public controller_interface::MultiInterfaceCont
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(
       const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
       const Eigen::Matrix<double, 7, 1>& tau_J_d);  // should this be tau_J?
+  Eigen::Matrix<double, 7, 1> clampTorques(
+    const Eigen::Matrix<double, 7, 1>& tau_d) const;
   
   std::mutex tau_d_mutex_;
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
@@ -48,6 +50,7 @@ class DrakeImpedanceController : public controller_interface::MultiInterfaceCont
 
   // ROS Subscriber
   ros::Subscriber sub_torque_commands_;   // read torque commands sent from drake
+  ros::Publisher pub_joint_states_;
   void torqueCommandCallback(const std_msgs::Float64MultiArray& msg);
 };
 

@@ -101,6 +101,7 @@ class SafetyLayer:
     EEy = msg.O_T_EE[13] # y
     EEz = msg.O_T_EE[14] # z
     position = np.array([EEx, EEy, EEz])
+    print("EE", position)
     t = msg.time
 
     z_axis = np.array([msg.O_T_EE[8], msg.O_T_EE[9], msg.O_T_EE[10]])
