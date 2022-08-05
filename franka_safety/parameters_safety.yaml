@@ -1,10 +1,20 @@
 # specify the halfspace constraint of each virtual wall
 # halfspace constraint defined as ax + by + cz > d
 
-virtual_walls:
-  wall_self_coll: {a: 1.0,  b: 0.0, c: 0.0, d: 0.18}
-  wall_table: {a: 0.0, b: 0.0, c: 1.0, d: 0.05}
-  # wall_testing: {a: 0.0, b: -1.0, c: 0.0, d: -0.04}
+franka_virtual_walls:
+  wall_upper_x: {a: -1.0, b: 0,0, c: 0.0, d: -0.75}
+  wall_self_coll: {a: 1.0,  b: 0.0, c: 0.0, d: 0.3}
+  wall_table: {a: 0.0, b: 0.0, c: 1.0, d: 0.02}
+  wall_ceiling: {a: 0.0, b: 0.0, c: -1.0, d: -0.15}
+  wall_left: {a: 0.0, b: -1.0, c: 0.0, d: -0.25}
+  wall_right: {a: 0.0, b: 1.0, c: 0.0, d: -0.25}
+
+
+ball_virtual_walls:
+  upper_x_wall: {a: -1.0,  b: 0.0, c: 0.0, d: -0.8}
+  lower_x_wall: {a: 1.0,  b: 0.0, c: 0.0, d: 0.3}
+  right_wall: {a: 0.0, b: 1.0, c: 0.0, d: -0.3}
+  left_wall: {a: 0.0, b: -1.0, c: 0.0, d: -0.3}
 
 end_effector_limits:
   velocity_limit: 0.5
@@ -16,18 +26,25 @@ joint_position_limits:
   joint3: {lower: -0.785, upper: 0.3}       # [-35, 17.2]
   # joint4: {lower: -2.617, upper: -1.3}      # [-150, -75]
   joint4: {lower: -2.8, upper: -1.3}      # [-150, -75]
-  joint5: {lower: -0.524, upper: 0.3}       # [-30, 17.2]
+  joint5: {lower: -0.524, upper: 0.6}       # [-30, 17.2]
   joint6: {lower: 1.57, upper: 3.4}         # [90, 195]
   joint7: {lower: -0.3, upper: 2.617}       # [-17.2, 150]
 
 joint_velocity_limits:
-  joint1: 1.5
-  joint2: 1.5
-  joint3: 1.5
-  joint4: 1.5
-  joint5: 1.5
-  joint6: 1.5
-  joint7: 2.5
+  # joint1: 1.5
+  # joint2: 1.5
+  # joint3: 1.5
+  # joint4: 1.5
+  # joint5: 1.5
+  # joint6: 1.5
+  # joint7: 1.5
+  joint1: 0.6
+  joint2: 0.6
+  joint3: 0.6
+  joint4: 0.6
+  joint5: 0.6
+  joint6: 0.6
+  joint7: 0.6
 
 joint_torque_limits:
   joint1: 43.5
@@ -39,10 +56,12 @@ joint_torque_limits:
   joint7: 6
 
 collision_limits:
-  joint1: 20
-  joint2: 20
-  joint3: 20
-  joint4: 20
-  joint5: 20
-  joint6: 20
-  joint7: 20
+  joint1: 5
+  joint2: 5
+  joint3: 5
+  joint4: 5
+  joint5: 2.5
+  joint6: 2.5
+  joint7: 2.5
+
+ball_velocity_limit: 1.5

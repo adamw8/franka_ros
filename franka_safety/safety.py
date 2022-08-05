@@ -5,9 +5,11 @@ import numpy as np
 import yaml
 from franka_msgs.srv import TriggerError
 from franka_msgs.msg import FrankaState
+from std_msgs.msg import Float64MultiArray
+import time
 
 class SafetyLayer:
-  def __init__(self, robot_state_topic, safety_params):
+  def __init__(self, robot_state_topic, ball_position_topic, safety_params):
     # setup service client request for trigger_error
     print("Waiting to set up trigger_error service")
     rospy.wait_for_service('/franka_control/trigger_error')
@@ -15,8 +17,10 @@ class SafetyLayer:
     print("Finished trigger setup")
 
     self.robot_state_topic = robot_state_topic
-    self.subsriber = rospy.Subscriber(robot_state_topic, FrankaState, 
-      self.safety_callback, tcp_nodelay=True)
+    self.franka_subscriber = rospy.Subscriber(robot_state_topic, FrankaState, 
+      self.franka_safety_callback, tcp_nodelay=True)
+    self.ball_subscriber = rospy.Subscriber(ball_position_topic, Float64MultiArray, 
+      self.ball_safety_callback, tcp_nodelay=True)
 
     # ensure safety bounds are reasonable
     # hard limits provided by franka
@@ -85,44 +89,49 @@ class SafetyLayer:
             joint, limit, 0.9*hard_torque_limits[joint], joint))
         self.joint_torque_limits[joint] = 0.9*hard_torque_limits[joint]
 
-    self.virtual_walls = safety_params["virtual_walls"]
+    self.franka_virtual_walls = safety_params["franka_virtual_walls"]
+    self.ball_virtual_walls = safety_params["ball_virtual_walls"]
     self.end_effector_limits = safety_params["end_effector_limits"]
     self.collision_limits = safety_params["collision_limits"]
+    self.ball_velocity_limit = safety_params["ball_velocity_limit"]
 
     # member functions for computations
-    self.prev_time = None
+    self.prev_time_franka = None
     self.prev_EE_position = None
+    self.prev_time_ball = None
+    self.prev_ball_position = None
+    self.prev_ball_velocity = 0
 
     print("Finished initializing SafetyLayer object")
 
-  def safety_callback(self, msg):
+  def franka_safety_callback(self, msg):
     # parse msg
     EEx = msg.O_T_EE[12] # x
     EEy = msg.O_T_EE[13] # y
     EEz = msg.O_T_EE[14] # z
     position = np.array([EEx, EEy, EEz])
-    print("EE", position)
-    t = msg.time
+    # print("EE", position)
 
     z_axis = np.array([msg.O_T_EE[8], msg.O_T_EE[9], msg.O_T_EE[10]])
     zd = np.array([0, 0, -1])
 
     # check virtual walls
-    for name, wall in self.virtual_walls.items():
+    for name, wall in self.franka_virtual_walls.items():
       a, b, c, d = wall['a'], wall['b'], wall['c'], wall['d']
       if ((a * EEx + b * EEy + c * EEz) <= d):
-        rospy.logerr('VIOLATED VIRTUAL WALL: ' + name)
+        rospy.logerr('FRANKA VIOLATED VIRTUAL WALL: ' + name)
         self.trigger_error_wrapper()
 
     # check end effector velocity
+    t = time.time()
     if self.prev_EE_position is not None:
-      velocity = (position - self.prev_EE_position) / (t-prev_time)
+      velocity = (position - self.prev_EE_position) / (t-self.prev_time_franka)
       if np.linalg.norm(velocity) > self.end_effector_limits["velocity_limit"]:
         rospy.logerr("VIOLATED END EFFECTOR VELOCITY LIMIT")
         self.trigger_error_wrapper()
     
-    prev_EE_position = position
-    prev_time = t
+    self.prev_EE_position = position
+    self.prev_time_franka = t
 
     # check orientation
     angle_from_vertical = np.arccos(zd.dot(z_axis))
@@ -133,7 +142,6 @@ class SafetyLayer:
     # check joint position, velocity, torque limits, collisions
     for i in range(7):
       joint = "joint{}".format(i+1)
-      # print(joint, msg.tau_J[i])
       if msg.q[i] < self.joint_position_limits[joint]["lower"]:
         rospy.logerr(joint + ' HAS VIOLATED ITS LOWER POSITION LIMIT')
         self.trigger_error_wrapper()
@@ -150,6 +158,31 @@ class SafetyLayer:
         rospy.logerr(joint + ' HAS SENSED A COLLISION')
         self.trigger_error_wrapper()
 
+  def ball_safety_callback(self, msg):
+    # parse msg
+    position = np.array([msg.data[0], msg.data[1], msg.data[2]])
+
+    # check virtual walls
+    for name, wall in self.ball_virtual_walls.items():
+      a, b, c, d = wall['a'], wall['b'], wall['c'], wall['d']
+      if ((a * position[0] + b * position[1] + c * position[2]) <= d):
+        rospy.logerr('BALL VIOLATED VIRTUAL WALL: ' + name)
+        self.trigger_error_wrapper()
+
+    # check ball velocity
+    # t = time.time()
+    # if self.prev_ball_position is not None:
+    #   v = (position - self.prev_ball_position) / (t-self.prev_time_ball)
+    #   filtered_v = 0.9*v + 0.1*self.prev_ball_velocity
+    #   self.prev_ball_velocity = v
+
+    #   if np.linalg.norm(filtered_v) > self.ball_velocity_limit:
+    #     rospy.logerr('BALL VIOLATED VELOCITY LIMIT')
+    #     self.trigger_error_wrapper()
+
+    # self.prev_ball_position = position
+    # self.prev_time_ball = t
+
   def trigger_error_wrapper(self):
     try:
         resp = self.trigger_error(True)
@@ -160,11 +193,12 @@ if __name__ == "__main__":
   rospy.init_node("safety_script")
   param_path = "/home/dair-manipulation/adam_ws/franka_ws/catkin_ws/src/franka_ros/franka_safety/parameters_safety.yaml"
   franka_state_topic = "/franka_state_controller/franka_states"
+  ball_state_topic = "/c3/position_estimate"
 
   with open(param_path, 'r') as stream:
       safety_params = yaml.safe_load(stream)
   print("Finished reading safety params")
-  safety = SafetyLayer(franka_state_topic, safety_params)
+  safety = SafetyLayer(franka_state_topic, ball_state_topic, safety_params)
 
   print("Spinning")
   rospy.spin()

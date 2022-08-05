@@ -46,7 +46,7 @@ class DrakeImpedanceController : public controller_interface::MultiInterfaceCont
   std::vector<hardware_interface::JointHandle> position_joint_handles_;
 
   Eigen::Matrix<double, 8, 1> tau_d_;
-  const double delta_tau_max_{1.0};
+  const double delta_tau_max_{0.5};
 
   // ROS Subscriber
   ros::Subscriber sub_torque_commands_;   // read torque commands sent from drake
