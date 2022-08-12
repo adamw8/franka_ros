@@ -56,12 +56,12 @@ joint_torque_limits:
   joint7: 6
 
 collision_limits:
-  joint1: 5
-  joint2: 5
-  joint3: 5
-  joint4: 5
-  joint5: 2.5
-  joint6: 2.5
-  joint7: 2.5
+  joint1: 100
+  joint2: 100
+  joint3: 100
+  joint4: 100
+  joint5: 20
+  joint6: 20
+  joint7: 20
 
 ball_velocity_limit: 1.5

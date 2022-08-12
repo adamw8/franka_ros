@@ -101,6 +101,7 @@ class SafetyLayer:
     self.prev_time_ball = None
     self.prev_ball_position = None
     self.prev_ball_velocity = 0
+    self.last_ball_msg_timestamp = None
 
     print("Finished initializing SafetyLayer object")
 
@@ -110,6 +111,7 @@ class SafetyLayer:
     EEy = msg.O_T_EE[13] # y
     EEz = msg.O_T_EE[14] # z
     position = np.array([EEx, EEy, EEz])
+    # print(position)
     # print("EE", position)
 
     z_axis = np.array([msg.O_T_EE[8], msg.O_T_EE[9], msg.O_T_EE[10]])
@@ -161,6 +163,9 @@ class SafetyLayer:
   def ball_safety_callback(self, msg):
     # parse msg
     position = np.array([msg.data[0], msg.data[1], msg.data[2]])
+    if np.isnan(position).any():
+      rospy.logerr('CAMERAS DID NOT SEE BALL, RETURNED NAN POSITION')
+      self.trigger_error_wrapper()
 
     # check virtual walls
     for name, wall in self.ball_virtual_walls.items():
@@ -168,6 +173,16 @@ class SafetyLayer:
       if ((a * position[0] + b * position[1] + c * position[2]) <= d):
         rospy.logerr('BALL VIOLATED VIRTUAL WALL: ' + name)
         self.trigger_error_wrapper()
+    
+    t = time.time()
+    if self.last_ball_msg_timestamp is not None:
+      if t - self.last_ball_msg_timestamp > 0.1:
+        rospy.logerr('VIOLATED BALL MESSAGE TIMEOUT')
+        self.trigger_error_wrapper()
+    self.last_ball_msg_timestamp = t
+    
+
+    
 
     # check ball velocity
     # t = time.time()
