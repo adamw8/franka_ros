@@ -48,7 +48,7 @@ joint_velocity_limits:
 
 joint_torque_limits:
   joint1: 43.5
-  joint2: 43.5
+  joint2: 50
   joint3: 43.5
   joint4: 43.5 
   joint5: 6
